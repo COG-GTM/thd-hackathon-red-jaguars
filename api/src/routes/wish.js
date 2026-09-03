@@ -4,6 +4,7 @@ var multer = require('multer');
 var fs = require('fs');
 var storage = multer.memoryStorage();
 var upload = multer({ storage: storage });
+const { requireAuth, requireRole, isStaff } = require('../middleware/auth')
 
 const Schema = mongoose.Schema
 let ChildWish = mongoose.Schema({
@@ -32,6 +33,7 @@ let ChildWish = mongoose.Schema({
 
 let Wish = mongoose.model('Wish', ChildWish, 'wish')
 
+router.use(requireAuth)
 
 router.post('/create', upload.single('photo'),function(req, res, next) {
   console.log('creating wish')
@@ -47,7 +49,7 @@ router.post('/create', upload.single('photo'),function(req, res, next) {
       console.log("The file was saved!");
     });
   }
-  const { age, firstName, homeTown, wishType, gender, wishDate, illness, wishDetail, orgId, userId, audio, photo, video } = req.body
+  const { age, firstName, homeTown, wishType, gender, wishDate, illness, wishDetail, orgId, audio, photo, video } = req.body
   let newWish = new Wish({
     firstName: firstName,
     age: age,
@@ -58,7 +60,7 @@ router.post('/create', upload.single('photo'),function(req, res, next) {
     illness: illness,
     wishDetail: wishDetail,
     orgId: orgId,
-    userId: userId,
+    userId: String(req.user._id),
     audio: audio,
     video: video,
     photoURL: req.file ? fileName : ""
@@ -106,7 +108,10 @@ router.post('/create', upload.single('photo'),function(req, res, next) {
 
 router.get('/findAll', function(req, res, next) {
   console.log('fetching wishes')
-  Wish.find()
+  const wishes = isStaff(req.user)
+    ? Wish.find()
+    : Wish.find({ userId: String(req.user._id) })
+  wishes
     .then(wishes => {
       console.log("fetched")
       res.send(wishes);
@@ -121,7 +126,7 @@ router.get('/findAll', function(req, res, next) {
 router.get('/findOneById/:id', function(req, res) {
   console.log('finding one by ID', req.params.id)
   let id = req.params.id;
-  Wish.findOne({_id: id })
+  Wish.findOne(isStaff(req.user) ? {_id: id} : {_id: id, userId: String(req.user._id)})
     .then(wish => {
       if(!wish) {
         return res.status(404).send({
@@ -144,7 +149,7 @@ router.get('/findOneById/:id', function(req, res) {
 router.delete('/delete/:id', function(req, res) {
   console.log('Deleting a wish by Id');
   let id = req.params.id;
-  Wish.findOneAndRemove({_id: id})
+  Wish.findOneAndRemove(isStaff(req.user) ? {_id: id} : {_id: id, userId: String(req.user._id)})
     .then(wish => {
       if(!wish) {
         return res.status(404).send({
@@ -165,7 +170,7 @@ router.delete('/delete/:id', function(req, res) {
 })
 
 
-router.put('/update/:id',upload.single('sponsorLogo'), function(req, res) {
+router.put('/update/:id', requireRole('admin','manager'), upload.single('sponsorLogo'), function(req, res) {
   console.log('Updating a wish');
   let id = req.params.id;
   if (!req.body) {
