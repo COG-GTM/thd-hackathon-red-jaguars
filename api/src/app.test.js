@@ -67,3 +67,57 @@ describe('auth', () => {
     })
   })
 })
+
+describe('wish authz', () => {
+  it('requires authentication to find all wishes', async () => {
+    const response = await request(app).get('/wish/findAll')
+
+    expect(response.statusCode).toEqual(401)
+  })
+
+  it('requires authentication to delete a wish', async () => {
+    const response = await request(app).delete(
+      '/wish/delete/000000000000000000000000'
+    )
+
+    expect(response.statusCode).toEqual(401)
+  })
+
+  it('requires authentication to update a wish', async () => {
+    const response = await request(app).put(
+      '/wish/update/000000000000000000000000'
+    )
+
+    expect(response.statusCode).toEqual(401)
+  })
+
+  it('allows users to find their wishes but not update them', async () => {
+    const agent = request.agent(app)
+    const registerResponse = await agent
+      .post('/auth/register')
+      .type('form')
+      .send({
+        username: 'wish-user',
+        password: 'secret-password',
+        role: 'user'
+      })
+
+    expect(registerResponse.statusCode).toEqual(200)
+
+    const loginResponse = await agent
+      .post('/auth/login')
+      .type('form')
+      .send({ username: 'wish-user', password: 'secret-password' })
+
+    expect(loginResponse.statusCode).toEqual(200)
+
+    const updateResponse = await agent.put(
+      '/wish/update/000000000000000000000000'
+    )
+    expect(updateResponse.statusCode).toEqual(403)
+
+    const findAllResponse = await agent.get('/wish/findAll')
+    expect(findAllResponse.statusCode).toEqual(200)
+    expect(findAllResponse.body).toEqual([])
+  })
+})
