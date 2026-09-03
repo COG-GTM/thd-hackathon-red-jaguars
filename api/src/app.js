@@ -58,7 +58,15 @@ app.use('/wish', wish)
 app.use('/about', about)
 
 console.log(__dirname)
-app.use('/uploads',express.static( 'uploads'))
+app.use('/uploads', express.static('uploads', {
+  index: false,
+  dotfiles: 'deny',
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox")
+    res.setHeader('Content-Disposition', 'attachment')
+  }
+}))
 
 // catch 404 and forward to error handler
 app.use((req, res, next) => {
