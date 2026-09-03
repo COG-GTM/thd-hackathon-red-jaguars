@@ -19,6 +19,7 @@ const Landing =(props)=>  {
       url: url,
       method: 'POST',
       data: formData,
+      withCredentials: true,
       config: { headers: { 'Content-Type': 'multipart/form-data' } }
     })
       .then(() => {
