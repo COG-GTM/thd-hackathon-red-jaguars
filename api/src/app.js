@@ -7,7 +7,7 @@ const compression = require('compression')
 const errorHandler = require('api-error-handler')
 const passport = require('passport')
 const LocalStrategy = require('passport-local').Strategy
-var fs = require('fs');
+var fs = require('fs')
 
 const index = require('./routes')
 const auth = require('./routes/auth')
@@ -52,6 +52,40 @@ passport.deserializeUser(Account.deserializeUser())
 
 require('./db/bootstrap-mongoose')
 
+if (
+  process.env.NODE_ENV !== 'production' &&
+  process.env.NODE_ENV !== 'test' &&
+  process.env.SEED_DEFAULT_ACCOUNTS === 'true'
+) {
+  const defaultAccounts = [
+    { username: 'admin', role: 'admin' },
+    { username: 'manager', role: 'manager' }
+  ]
+
+  defaultAccounts.forEach(({ username, role }) => {
+    Account.findOne({ username })
+      .then(account => {
+        if (account) {
+          return
+        }
+
+        return new Promise((resolve, reject) => {
+          Account.register(
+            new Account({ username, lastName: username, role }),
+            username,
+            err => {
+              if (err) {
+                return reject(err)
+              }
+              resolve()
+            }
+          )
+        })
+      })
+      .catch(err => console.log(err))
+  })
+}
+
 app.use('/', index)
 app.use('/auth', auth)
 app.use('/wish', wish)
@@ -76,24 +110,4 @@ if (process.env.NODE_ENV !== 'test') {
     console.log('Express server listening on port ' + server.address().port)
   })
 }
-
-
-let fetch = require('node-fetch');
-
-fetch('http://localhost:3002/auth/register', {
-  method: 'POST',
-  headers: {'Content-Type': 'application/json'},
-  body: '{"username":"manager","password":"manager","lastName":"manager","role":"manager"}'
-}).then(response => {
-  console.log("manager created")
-}).catch(err => {console.log(err);});
-
-fetch('http://localhost:3002/auth/register', {
-  method: 'POST',
-  headers: {'Content-Type': 'application/json'},
-  body: '{"username":"admin","password":"admin","lastName":"admin","role":"admin"}'
-}).then(response => {
-  console.log("admin created")
-}).catch(err => {console.log(err);});
-
 module.exports = app

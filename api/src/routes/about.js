@@ -1,17 +1,27 @@
 const router = require('express').Router()
 const mongoose = require('mongoose')
-var multer = require('multer');
-var fs = require('fs');
-var storage = multer.memoryStorage();
-var upload = multer({ storage: storage });
+const path = require('path')
+const { ensureAuthenticated } = require('../middleware/auth')
+var multer = require('multer')
+var fs = require('fs')
+var storage = multer.memoryStorage()
+var upload = multer({ storage: storage })
 
-router.post('/picUpload', upload.single('photo'),function(req, res, next) {
+router.post(
+  '/picUpload',
+  ensureAuthenticated,
+  upload.single('photo'),
+  function(req, res, next) {
   console.log('creating volonteer')
   
-  let fileName= "uploads/" + req.body.fileName + ".png";
+  const fileName = path.basename(String(req.body.fileName))
+  if (!/^[\w.-]+$/.test(fileName)) {
+    return res.status(400).json({ message: 'Invalid file name' })
+  }
+  let uploadPath= "uploads/" + fileName + ".png";
   if(req.file)
   {
-    fs.writeFile(fileName, req.file.buffer, function (err) {
+    fs.writeFile(uploadPath, req.file.buffer, function (err) {
       if (err) {
         console.log("in err")
         return console.log(err);
@@ -20,7 +30,8 @@ router.post('/picUpload', upload.single('photo'),function(req, res, next) {
     });
   }
   res.send(200)
-})
+  }
+)
 
 
 module.exports = router

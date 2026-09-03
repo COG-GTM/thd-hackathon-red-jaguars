@@ -2,21 +2,35 @@ const router = require('express').Router()
 const passport = require('passport')
 const Account = require('../db/Account')
 
-router.post('/register', function(req, res, next) {
+router.post('/register', async function(req, res, next) {
   console.log('registering user')
   const { username, firstName, lastName, role } = req.body
 
-  Account.register(
-    new Account({ username, firstName, lastName, role }),
-    req.body.password,
-    function(err) {
-      if (err) {
-        return next(err)
-      }
-
-      res.sendStatus(200)
+  try {
+    const accountCount = await Account.countDocuments({})
+    const isAdmin = req.isAuthenticated && req.isAuthenticated() &&
+      req.user.role === 'admin'
+    if (accountCount !== 0 && !isAdmin) {
+      return res.status(403).json({ message: 'Forbidden' })
     }
-  )
+
+    await new Promise((resolve, reject) => {
+      Account.register(
+        new Account({ username, firstName, lastName, role }),
+        req.body.password,
+        function(err) {
+          if (err) {
+            return reject(err)
+          }
+          resolve()
+        }
+      )
+    })
+
+    res.sendStatus(200)
+  } catch (err) {
+    next(err)
+  }
 })
 
 router.post('/login', passport.authenticate('local'), function(req, res) {
