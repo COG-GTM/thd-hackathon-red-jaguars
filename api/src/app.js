@@ -75,20 +75,6 @@ if (process.env.NODE_ENV !== 'test') {
   const server = app.listen(app.get('port'), function() {
     console.log('Express server listening on port ' + server.address().port)
   })
-
-  const seedAccounts = [
-    { username: 'manager', password: 'manager', lastName: 'manager', role: 'manager' },
-    { username: 'admin', password: 'admin', lastName: 'admin', role: 'admin' }
-  ]
-  seedAccounts.forEach(({ password, ...account }) => {
-    Account.register(new Account(account), password, err => {
-      if (err) {
-        console.log(err.message)
-      } else {
-        console.log(account.username + ' created')
-      }
-    })
-  })
 }
 
 module.exports = app
