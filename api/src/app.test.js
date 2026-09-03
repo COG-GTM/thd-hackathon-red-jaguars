@@ -63,7 +63,70 @@ describe('auth', () => {
         .type('form')
         .send({ username: 'secrete-username', password: 'secret-password' })
 
-      expect(badRegisterResponse.statusCode).toEqual(500)
+      expect(badRegisterResponse.statusCode).toEqual(403)
     })
+  })
+})
+
+describe('API authorization', () => {
+  it('requires authentication to find all wishes', async () => {
+    const response = await request(app).get('/wish/findAll')
+
+    expect(response.statusCode).toEqual(401)
+  })
+
+  it('requires authentication to delete a wish', async () => {
+    const response = await request(app).delete(
+      '/wish/delete/000000000000000000000000'
+    )
+
+    expect(response.statusCode).toEqual(401)
+  })
+
+  it('requires authentication to upload an about picture', async () => {
+    const response = await request(app).post('/about/picUpload')
+
+    expect(response.statusCode).toEqual(401)
+  })
+
+  it('allows an authenticated user to find all wishes', async () => {
+    const agent = request.agent(app)
+    const registerResponse = await agent
+      .post('/auth/register')
+      .type('form')
+      .send({
+        username: 'admin-user',
+        password: 'admin-password',
+        role: 'admin'
+      })
+
+    expect(registerResponse.statusCode).toEqual(200)
+
+    const loginResponse = await agent
+      .post('/auth/login')
+      .type('form')
+      .send({ username: 'admin-user', password: 'admin-password' })
+
+    expect(loginResponse.statusCode).toEqual(200)
+
+    const response = await agent.get('/wish/findAll')
+
+    expect(response.statusCode).toEqual(200)
+  })
+
+  it('rejects unauthenticated registration after an account exists', async () => {
+    const registerResponse = await request(app)
+      .post('/auth/register')
+      .type('form')
+      .send({ username: 'first-user', password: 'first-password' })
+
+    expect(registerResponse.statusCode).toEqual(200)
+
+    const secondRegisterResponse = await request(app)
+      .post('/auth/register')
+      .type('form')
+      .send({ username: 'second-user', password: 'second-password' })
+
+    expect(secondRegisterResponse.statusCode).toEqual(403)
   })
 })

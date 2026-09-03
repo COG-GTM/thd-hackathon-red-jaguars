@@ -1,9 +1,10 @@
 const router = require('express').Router()
 const mongoose = require('mongoose')
-var multer = require('multer');
-var fs = require('fs');
-var storage = multer.memoryStorage();
-var upload = multer({ storage: storage });
+const { canModifyWish, ensureAuthenticated, requireRole } = require('../middleware/auth')
+var multer = require('multer')
+var fs = require('fs')
+var storage = multer.memoryStorage()
+var upload = multer({ storage: storage })
 
 const Schema = mongoose.Schema
 let ChildWish = mongoose.Schema({
@@ -33,7 +34,11 @@ let ChildWish = mongoose.Schema({
 let Wish = mongoose.model('Wish', ChildWish, 'wish')
 
 
-router.post('/create', upload.single('photo'),function(req, res, next) {
+router.post(
+  '/create',
+  requireRole('manager', 'admin'),
+  upload.single('photo'),
+  function(req, res, next) {
   console.log('creating wish')
   
   let fileName= "uploads/" + new Date().getTime() + (req.file && req.file.originalname);
@@ -47,7 +52,7 @@ router.post('/create', upload.single('photo'),function(req, res, next) {
       console.log("The file was saved!");
     });
   }
-  const { age, firstName, homeTown, wishType, gender, wishDate, illness, wishDetail, orgId, userId, audio, photo, video } = req.body
+  const { age, firstName, homeTown, wishType, gender, wishDate, illness, wishDetail, orgId, audio, photo, video } = req.body
   let newWish = new Wish({
     firstName: firstName,
     age: age,
@@ -58,7 +63,7 @@ router.post('/create', upload.single('photo'),function(req, res, next) {
     illness: illness,
     wishDetail: wishDetail,
     orgId: orgId,
-    userId: userId,
+    userId: String(req.user._id),
     audio: audio,
     video: video,
     photoURL: req.file ? fileName : ""
@@ -73,7 +78,8 @@ router.post('/create', upload.single('photo'),function(req, res, next) {
         message: err.message || "Error occurred while creating the wish."
   });
   });
-})
+  }
+)
 
 // router.post('/createxxx',function(req, res, next) {
 //   console.log('creating wish')
@@ -104,7 +110,7 @@ router.post('/create', upload.single('photo'),function(req, res, next) {
 //   });
 // })
 
-router.get('/findAll', function(req, res, next) {
+router.get('/findAll', ensureAuthenticated, function(req, res, next) {
   console.log('fetching wishes')
   Wish.find()
     .then(wishes => {
@@ -118,7 +124,7 @@ router.get('/findAll', function(req, res, next) {
 })
 
 
-router.get('/findOneById/:id', function(req, res) {
+router.get('/findOneById/:id', ensureAuthenticated, function(req, res) {
   console.log('finding one by ID', req.params.id)
   let id = req.params.id;
   Wish.findOne({_id: id })
@@ -141,17 +147,22 @@ router.get('/findOneById/:id', function(req, res) {
   });
 });
 
-router.delete('/delete/:id', function(req, res) {
+router.delete('/delete/:id', ensureAuthenticated, function(req, res) {
   console.log('Deleting a wish by Id');
   let id = req.params.id;
-  Wish.findOneAndRemove({_id: id})
+  Wish.findOne({_id: id})
     .then(wish => {
       if(!wish) {
         return res.status(404).send({
           message: "wish not found with id " + req.params.id
         });
       }
-      res.send({message: "Wish successfully deleted"})
+      if (!canModifyWish(wish, req.user)) {
+        return res.status(403).send({ message: "Forbidden" });
+      }
+      return wish.remove().then(() => {
+        res.send({message: "Wish successfully deleted"})
+      })
     }).catch(err => {
     if(err.kind === 'ObjectId' || err.name === 'NotFound') {
       return res.status(404).send({
@@ -165,7 +176,11 @@ router.delete('/delete/:id', function(req, res) {
 })
 
 
-router.put('/update/:id',upload.single('sponsorLogo'), function(req, res) {
+router.put(
+  '/update/:id',
+  requireRole('manager', 'admin'),
+  upload.single('sponsorLogo'),
+  function(req, res) {
   console.log('Updating a wish');
   let id = req.params.id;
   if (!req.body) {
@@ -186,19 +201,23 @@ router.put('/update/:id',upload.single('sponsorLogo'), function(req, res) {
     });
   }
   
-  Wish.findOneAndUpdate({_id: id }, { $set:{
-    orgId: req.body.orgId,
-    audio: req.body.audio,
-    video: req.body.video,
-    sponsorLogoURL:req.file ? fileName : ""
-  }}, {new: true})
+  Wish.findOne({_id: id })
     .then(wish => {
       if (!wish) {
-        return res.status(400).send({
+        return res.status(404).send({
           message: "Wish not found with id " + req.body._id
         });
       }
-      res.send(wish);
+      if (!canModifyWish(wish, req.user)) {
+        return res.status(403).send({ message: "Forbidden" });
+      }
+      Object.assign(wish, {
+        orgId: req.body.orgId,
+        audio: req.body.audio,
+        video: req.body.video,
+        sponsorLogoURL:req.file ? fileName : ""
+      })
+      return wish.save().then(() => res.send(wish))
     }).catch(err => {
     if(err.kind === 'ObjectId' || err.name === 'NotFound') {
       return res.status(404).send({
@@ -209,6 +228,7 @@ router.put('/update/:id',upload.single('sponsorLogo'), function(req, res) {
       message: "Error Updating wish with id " + req.body._id
     });
   });
-})
+  }
+)
 
 module.exports = router
