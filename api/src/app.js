@@ -75,25 +75,20 @@ if (process.env.NODE_ENV !== 'test') {
   const server = app.listen(app.get('port'), function() {
     console.log('Express server listening on port ' + server.address().port)
   })
+
+  const seedAccounts = [
+    { username: 'manager', password: 'manager', lastName: 'manager', role: 'manager' },
+    { username: 'admin', password: 'admin', lastName: 'admin', role: 'admin' }
+  ]
+  seedAccounts.forEach(({ password, ...account }) => {
+    Account.register(new Account(account), password, err => {
+      if (err) {
+        console.log(err.message)
+      } else {
+        console.log(account.username + ' created')
+      }
+    })
+  })
 }
-
-
-let fetch = require('node-fetch');
-
-fetch('http://localhost:3002/auth/register', {
-  method: 'POST',
-  headers: {'Content-Type': 'application/json'},
-  body: '{"username":"manager","password":"manager","lastName":"manager","role":"manager"}'
-}).then(response => {
-  console.log("manager created")
-}).catch(err => {console.log(err);});
-
-fetch('http://localhost:3002/auth/register', {
-  method: 'POST',
-  headers: {'Content-Type': 'application/json'},
-  body: '{"username":"admin","password":"admin","lastName":"admin","role":"admin"}'
-}).then(response => {
-  console.log("admin created")
-}).catch(err => {console.log(err);});
 
 module.exports = app
