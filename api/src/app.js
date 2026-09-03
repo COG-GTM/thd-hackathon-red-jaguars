@@ -77,23 +77,4 @@ if (process.env.NODE_ENV !== 'test') {
   })
 }
 
-
-let fetch = require('node-fetch');
-
-fetch('http://localhost:3002/auth/register', {
-  method: 'POST',
-  headers: {'Content-Type': 'application/json'},
-  body: '{"username":"manager","password":"manager","lastName":"manager","role":"manager"}'
-}).then(response => {
-  console.log("manager created")
-}).catch(err => {console.log(err);});
-
-fetch('http://localhost:3002/auth/register', {
-  method: 'POST',
-  headers: {'Content-Type': 'application/json'},
-  body: '{"username":"admin","password":"admin","lastName":"admin","role":"admin"}'
-}).then(response => {
-  console.log("admin created")
-}).catch(err => {console.log(err);});
-
 module.exports = app
