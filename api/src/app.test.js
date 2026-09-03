@@ -49,6 +49,42 @@ describe('auth', () => {
     })
   })
 
+  describe('role assignment', () => {
+    it('ignores a client-supplied role on registration', async () => {
+      await request(app)
+        .post('/auth/register')
+        .type('form')
+        .send({ username: 'wannabe-admin', password: 'pw', role: 'admin' })
+
+      const loginResponse = await request(app)
+        .post('/auth/login')
+        .type('form')
+        .send({ username: 'wannabe-admin', password: 'pw' })
+
+      expect(loginResponse.statusCode).toEqual(200)
+      expect(loginResponse.body.role).toEqual('user')
+    })
+
+    it('does not let a non-admin change roles', async () => {
+      const agent = request.agent(app)
+      await agent
+        .post('/auth/register')
+        .type('form')
+        .send({ username: 'plain-user', password: 'pw' })
+      await agent
+        .post('/auth/login')
+        .type('form')
+        .send({ username: 'plain-user', password: 'pw' })
+
+      const response = await agent
+        .put('/auth/users/plain-user/role')
+        .type('form')
+        .send({ role: 'admin' })
+
+      expect(response.statusCode).toEqual(403)
+    })
+  })
+
   describe('edge cases', () => {
     it("doesn't allow you to register the same user twice", async () => {
       const registerResponse = await request(app)
