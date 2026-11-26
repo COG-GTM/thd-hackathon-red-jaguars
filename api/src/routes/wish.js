@@ -107,6 +107,7 @@ router.post('/create', upload.single('photo'),function(req, res, next) {
 router.get('/findAll', function(req, res, next) {
   console.log('fetching wishes')
   Wish.find()
+    .lean()
     .then(wishes => {
       console.log("fetched")
       res.send(wishes);
