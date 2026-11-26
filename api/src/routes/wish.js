@@ -32,22 +32,37 @@ let ChildWish = mongoose.Schema({
 
 let Wish = mongoose.model('Wish', ChildWish, 'wish')
 
-// Matches Mongoose's default toJSON output for lean results: empty objects are
-// dropped (minimize), except directly inside arrays.
-const skippedKeys = new Set(['__proto__', 'constructor', 'prototype'])
+// GET /wish/findAll reads lean rows and serializes them the way Wish#toJSON() would.
+// Rows holding values Mongoose would cast or clone differently (e.g. a number in a
+// String path, Dates or other BSON types in Mixed paths) are hydrated instead.
+const stringPaths = new Set(
+  Object.keys(ChildWish.paths).filter(path => ChildWish.paths[path].instance === 'String')
+)
+const specialKeys = new Set(['__proto__', 'constructor', 'prototype'])
+
+function isPlainJson(value) {
+  if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) {
+    return true
+  }
+  if (Array.isArray(value)) {
+    return value.every(isPlainJson)
+  }
+  return typeof value === 'object' &&
+    Object.getPrototypeOf(value) === Object.prototype &&
+    Object.keys(value).every(key => !specialKeys.has(key) && isPlainJson(value[key]))
+}
+
+// Mongoose's default `minimize`: empty objects are dropped, except directly inside arrays.
 function minimize(value, isArrayChild) {
   if (Array.isArray(value)) {
     return value.map(item => minimize(item, true))
   }
-  if (value === null || typeof value !== 'object' || value.constructor !== Object) {
+  if (value === null || typeof value !== 'object' || value instanceof mongoose.mongo.ObjectId) {
     return value
   }
   const result = {}
   let hasKeys = false
   for (const key of Object.keys(value)) {
-    if (skippedKeys.has(key)) {
-      continue
-    }
     const child = minimize(value[key], false)
     if (child !== undefined) {
       result[key] = child
@@ -55,6 +70,23 @@ function minimize(value, isArrayChild) {
     }
   }
   return hasKeys || isArrayChild ? result : undefined
+}
+
+function toWishJson(raw) {
+  const isConforming = Object.keys(raw).every(key => {
+    const value = raw[key]
+    if (key === '_id') {
+      return value instanceof mongoose.mongo.ObjectId
+    }
+    if (key === '__v') {
+      return typeof value === 'number'
+    }
+    if (stringPaths.has(key)) {
+      return typeof value === 'string'
+    }
+    return !specialKeys.has(key) && isPlainJson(value)
+  })
+  return isConforming ? minimize(raw, true) : Wish.hydrate(raw).toJSON()
 }
 
 
@@ -135,7 +167,7 @@ router.get('/findAll', function(req, res, next) {
     .lean()
     .then(wishes => {
       console.log("fetched")
-      res.send(wishes.map(wish => minimize(wish, true)));
+      res.send(wishes.map(toWishJson));
     }).catch( err => {
       res.status(500).send({
         message: err.message || "Some error occurred while retrieving notes"
