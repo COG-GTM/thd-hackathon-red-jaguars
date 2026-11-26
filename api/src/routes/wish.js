@@ -32,6 +32,31 @@ let ChildWish = mongoose.Schema({
 
 let Wish = mongoose.model('Wish', ChildWish, 'wish')
 
+// Matches Mongoose's default toJSON output for lean results: empty objects are
+// dropped (minimize), except directly inside arrays.
+const skippedKeys = new Set(['__proto__', 'constructor', 'prototype'])
+function minimize(value, isArrayChild) {
+  if (Array.isArray(value)) {
+    return value.map(item => minimize(item, true))
+  }
+  if (value === null || typeof value !== 'object' || value.constructor !== Object) {
+    return value
+  }
+  const result = {}
+  let hasKeys = false
+  for (const key of Object.keys(value)) {
+    if (skippedKeys.has(key)) {
+      continue
+    }
+    const child = minimize(value[key], false)
+    if (child !== undefined) {
+      result[key] = child
+      hasKeys = true
+    }
+  }
+  return hasKeys || isArrayChild ? result : undefined
+}
+
 
 router.post('/create', upload.single('photo'),function(req, res, next) {
   console.log('creating wish')
@@ -110,7 +135,7 @@ router.get('/findAll', function(req, res, next) {
     .lean()
     .then(wishes => {
       console.log("fetched")
-      res.send(wishes);
+      res.send(wishes.map(wish => minimize(wish, true)));
     }).catch( err => {
       res.status(500).send({
         message: err.message || "Some error occurred while retrieving notes"
