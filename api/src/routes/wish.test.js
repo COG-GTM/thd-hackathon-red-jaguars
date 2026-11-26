@@ -59,4 +59,22 @@ describe('GET /wish/findAll', () => {
     expect(actual).not.toHaveProperty('photo')
     expect(actual.video).toEqual({ tags: [{}, 'clip'] })
   })
+
+  it('serializes values Mongoose would cast the same way as a Mongoose document', async () => {
+    const [numericDate, nullConstructor, mixedDate] = await createWishes([
+      { firstName: 'Dee' },
+      { firstName: 'Eli' },
+      { firstName: 'Fay' }
+    ])
+    await Wish.collection.updateOne({ _id: numericDate._id }, { $set: { wishDate: 20190102, age: 8 } })
+    await Wish.collection.updateOne({ _id: nullConstructor._id }, { $set: { audio: { constructor: null, empty: {} } } })
+    await Wish.collection.updateOne({ _id: mixedDate._id }, { $set: { video: { at: new Date(0) } } })
+
+    const byId = await findAllById()
+
+    for (const wish of [numericDate, nullConstructor, mixedDate]) {
+      expect(JSON.stringify(byId.get(String(wish._id)))).toEqual(JSON.stringify(await expectedJson(wish._id)))
+    }
+    expect(byId.get(String(numericDate._id)).wishDate).toEqual('20190102')
+  })
 })
